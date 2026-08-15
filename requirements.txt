@@ -1,0 +1,7 @@
+requests
+beautifulsoup4
+pdfplumber
+pytesseract
+pdf2image
+datasketch
+tiktoken

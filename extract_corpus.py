@@ -39,6 +39,11 @@ import unicodedata
 from dataclasses import dataclass, asdict
 from pathlib import Path
 
+# If Tesseract is installed but pytesseract can't auto-locate it (common on
+# Windows even when `tesseract --version` works fine in your terminal), set
+# the exe path explicitly here or via --tesseract-cmd on the command line.
+_TESSERACT_CMD_OVERRIDE = None
+
 # ---------------------------------------------------------------------------
 # Stage 1: extraction
 # ---------------------------------------------------------------------------
@@ -71,6 +76,9 @@ def _ocr_pdf(path: Path) -> str:
     corpus stats, not silently blended in with clean-text documents."""
     import pytesseract
     from pdf2image import convert_from_path
+
+    if _TESSERACT_CMD_OVERRIDE:
+        pytesseract.pytesseract.tesseract_cmd = _TESSERACT_CMD_OVERRIDE
 
     pages = convert_from_path(str(path), dpi=200)
     return "\n".join(pytesseract.image_to_string(p) for p in pages).strip()
@@ -356,6 +364,12 @@ if __name__ == "__main__":
     ap.add_argument("--raw-dir", type=Path, default=Path("raw"))
     ap.add_argument("--out-dir", type=Path, default=Path("processed"))
     ap.add_argument("--val-frac", type=float, default=0.10)
+    ap.add_argument("--tesseract-cmd", type=str, default=None,
+                     help=r"Full path to tesseract.exe if pytesseract can't auto-detect it, "
+                          r"e.g. --tesseract-cmd \"C:\Program Files\Tesseract-OCR\tesseract.exe\"")
     args = ap.parse_args()
+
+    if args.tesseract_cmd:
+        _TESSERACT_CMD_OVERRIDE = args.tesseract_cmd
 
     run_pipeline(args.raw_dir, args.out_dir, args.val_frac)
