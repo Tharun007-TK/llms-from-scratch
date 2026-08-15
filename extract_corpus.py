@@ -120,6 +120,27 @@ def extract_document(path: Path) -> tuple[str, bool]:
         raise ValueError(f"Unsupported file type: {path.suffix}")
 
 
+def extract_document_with_timeout(path: Path, timeout: int = 90) -> tuple[str, bool]:
+    """Wraps extract_document with a hard timeout so one pathological file
+    (e.g. a huge scanned multi-page PDF, or a hung Poppler subprocess) can't
+    stall the entire run. On timeout, skips this file and moves on.
+
+    Caveat: Python can't force-kill a stuck thread, so a timed-out
+    extraction's underlying work may keep running in the background even
+    after we give up waiting on it. That's an acceptable tradeoff to
+    unblock the overall run — but if you hit many timeouts, your machine
+    may be doing more background work than the progress log suggests."""
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(extract_document, path)
+        try:
+            return future.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            raise TimeoutError(f"extraction exceeded {timeout}s — likely a large "
+                                f"scanned PDF or a hung OCR/Poppler call")
+
+
 # ---------------------------------------------------------------------------
 # Stage 2: cleaning
 # ---------------------------------------------------------------------------
@@ -286,7 +307,7 @@ def stratified_split(records: list[DocRecord], val_frac: float = 0.10, seed: int
 # Orchestration
 # ---------------------------------------------------------------------------
 
-def run_pipeline(raw_dir: Path, out_dir: Path, val_frac: float = 0.10):
+def run_pipeline(raw_dir: Path, out_dir: Path, val_frac: float = 0.10, timeout: int = 90):
     out_dir.mkdir(parents=True, exist_ok=True)
     records: list[DocRecord] = []
 
@@ -303,12 +324,20 @@ def run_pipeline(raw_dir: Path, out_dir: Path, val_frac: float = 0.10):
                  if f.suffix.lower() in (".pdf", ".html", ".htm")]
         print(f"[{source_type}] {len(files)} raw files found")
 
-        for f in files:
+        for i, f in enumerate(files):
+            if i % 100 == 0 and i > 0:
+                print(f"  ... {i}/{len(files)} processed in {source_type}")
             try:
-                raw_text, was_ocr = extract_document(f)
+                raw_text, was_ocr = extract_document_with_timeout(f, timeout=timeout)
+            except TimeoutError as e:
+                print(f"  SKIP {f.name}: {e}")
+                continue
             except Exception as e:
                 print(f"  SKIP {f.name}: extraction failed ({e})")
                 continue
+
+            if was_ocr:
+                print(f"  [OCR] {f.name}")
 
             cleaned = clean_text(raw_text)
             if len(cleaned) < 100:
@@ -367,9 +396,11 @@ if __name__ == "__main__":
     ap.add_argument("--tesseract-cmd", type=str, default=None,
                      help=r"Full path to tesseract.exe if pytesseract can't auto-detect it, "
                           r"e.g. --tesseract-cmd \"C:\Program Files\Tesseract-OCR\tesseract.exe\"")
+    ap.add_argument("--timeout", type=int, default=90,
+                     help="max seconds per document before skipping it (guards against hangs)")
     args = ap.parse_args()
 
     if args.tesseract_cmd:
         _TESSERACT_CMD_OVERRIDE = args.tesseract_cmd
 
-    run_pipeline(args.raw_dir, args.out_dir, args.val_frac)
+    run_pipeline(args.raw_dir, args.out_dir, args.val_frac, timeout=args.timeout)
