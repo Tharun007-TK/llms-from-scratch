@@ -1,7 +1,15 @@
 requests
 beautifulsoup4
 pdfplumber
-pytesseract
 pdf2image
 datasketch
 tiktoken
+paddleocr
+paddlepaddle
+
+# Optional — only needed if you use --ocr-engine tesseract instead of the
+# default paddleocr:
+# pytesseract
+
+datasets
+huggingface_hub

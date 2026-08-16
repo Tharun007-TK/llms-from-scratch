@@ -1,0 +1,28 @@
+{
+  "citation": "",
+  "description": "",
+  "features": {
+    "doc_id": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "source_type": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "text": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "char_count": {
+      "dtype": "int64",
+      "_type": "Value"
+    },
+    "was_ocr": {
+      "dtype": "bool",
+      "_type": "Value"
+    }
+  },
+  "homepage": "",
+  "license": ""
+}
