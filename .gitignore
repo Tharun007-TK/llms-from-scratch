@@ -23,3 +23,12 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Model weights / large binaries — NOT source code
+*.pt
+*.safetensors
+fingpt-131m/
+
+# HuggingFace Arrow dataset cache — published to HF Hub instead
+**/hf_dataset/train/data-*.arrow
+**/hf_dataset/validation/data-*.arrow
